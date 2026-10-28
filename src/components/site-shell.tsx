@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Menu, X, Facebook, Instagram, Youtube } from "lucide-react";
 import { authClient, rememberSessionToken, signOut } from "@/lib/auth/client";
+import { signInTestAccount } from "@/lib/auth/test-sign-in.functions";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { myAccess } from "@/lib/access.functions";
 import { company } from "@/lib/company";
@@ -167,21 +168,11 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
-    if (password.length < 6) {
-      setError("Use at least 6 characters.");
-      return;
-    }
     setBusy(true);
-    const id = email.trim();
-    const account = id.includes("@") ? id : `${id}@staff.alphaleasing.test`;
     try {
-      const result = await authClient.signIn.email({ email: account, password });
-      if (result.error) {
-        const message = result.error.message || "";
-        setError(/invalid email or password/i.test(message) ? "That employee ID or password isn’t right." : message || "Couldn’t sign in.");
-        return;
-      }
-      rememberSessionToken(result.data?.token ?? null);
+      const result = await signInTestAccount();
+      rememberSessionToken(result.token);
+      await authClient.getSession();
       const access = await myAccess().catch(() => ({ permissions: [] as string[] }));
       if (access.permissions.length) void navigate({ to: "/office" });
     } catch (reason) {
@@ -202,7 +193,6 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
         placeholder="Employee ID"
         type="text"
         autoComplete="username"
-        required
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         className={field}
@@ -212,7 +202,6 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
         placeholder="Password"
         type="password"
         autoComplete="current-password"
-        required
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         className={field}
