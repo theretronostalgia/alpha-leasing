@@ -1,10 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Menu, X, Facebook, Instagram, Youtube } from "lucide-react";
-import { authClient, rememberSessionToken, signOut } from "@/lib/auth/client";
+import { rememberSessionToken, signOut } from "@/lib/auth/client";
 import { signInTestAccount } from "@/lib/auth/test-sign-in.functions";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { myAccess } from "@/lib/access.functions";
 import { company } from "@/lib/company";
 import { type Permission } from "@/lib/access";
 import { useAccess } from "@/lib/use-access";
@@ -133,7 +132,6 @@ export function SiteHeader() {
 }
 
 export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
-  const navigate = useNavigate();
   const { user, isPending } = useCurrentUserState();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -172,9 +170,8 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
     try {
       const result = await signInTestAccount();
       rememberSessionToken(result.token);
-      await authClient.getSession();
-      const access = await myAccess().catch(() => ({ permissions: [] as string[] }));
-      if (access.permissions.length) void navigate({ to: "/office" });
+      window.location.assign("/office");
+      return;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn’t sign in.");
     } finally {
