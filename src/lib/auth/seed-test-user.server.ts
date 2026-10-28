@@ -4,6 +4,8 @@ export const TEST_EMPLOYEE_ID = "123456";
 export const TEST_EMPLOYEE_EMAIL = "123456@staff.alphaleasing.test";
 
 export async function seedTestEmployee(appAuth: typeof Auth) {
+  const { ensureDbReady, getSql } = await import("../db");
+  await ensureDbReady();
   try {
     await appAuth.api.signUpEmail({
       body: {
@@ -14,7 +16,7 @@ export async function seedTestEmployee(appAuth: typeof Auth) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (!/exist/i.test(message)) {
+    if (!/already exists|USER_ALREADY_EXISTS/i.test(message)) {
       console.error("Test employee seed failed", error);
     }
   }

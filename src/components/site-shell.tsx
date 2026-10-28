@@ -174,15 +174,21 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
     setBusy(true);
     const id = email.trim();
     const account = id.includes("@") ? id : `${id}@staff.alphaleasing.test`;
-    const result = await authClient.signIn.email({ email: account, password });
-    setBusy(false);
-    if (result.error) {
-      setError(result.error.message || "Couldn’t sign in.");
-      return;
+    try {
+      const result = await authClient.signIn.email({ email: account, password });
+      if (result.error) {
+        const message = result.error.message || "";
+        setError(/invalid email or password/i.test(message) ? "That employee ID or password isn’t right." : message || "Couldn’t sign in.");
+        return;
+      }
+      rememberSessionToken(result.data?.token ?? null);
+      const access = await myAccess().catch(() => ({ permissions: [] as string[] }));
+      if (access.permissions.length) void navigate({ to: "/office" });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Couldn’t sign in.");
+    } finally {
+      setBusy(false);
     }
-    rememberSessionToken(result.data?.token ?? null);
-    const access = await myAccess().catch(() => ({ permissions: [] as string[] }));
-    if (access.permissions.length) void navigate({ to: "/office" });
   }
 
   const field = stacked
