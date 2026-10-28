@@ -110,7 +110,13 @@ async function createPgliteSql(): Promise<Sql> {
   // One in-memory instance per process, shared across HMR module instances, so
   // data survives source edits (it resets on dev-server restart).
   globalRef.__pgliteInstance__ ??= (async () => {
-    const { PGlite } = await import("@electric-sql/pglite");
+    // Load the real package at runtime so the data file stays next to it.
+    // A bundled import points at /var/task/_libs/pglite.data, which hosts don't ship.
+    const specifier = "@electric-sql/pglite";
+    const load = new Function("name", "return import(name)") as (
+      name: string,
+    ) => Promise<typeof import("@electric-sql/pglite")>;
+    const { PGlite } = await load(specifier);
     const pg = new PGlite({
       parsers: {
         [OID_INT8]: Number,

@@ -157,6 +157,11 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
   },
   resolve: { tsconfigPaths: true },
+  // Keep PGLite outside the server bundle. Bundling it makes Vercel look for
+  // /var/task/_libs/pglite.data, which is never shipped.
+  ssr: {
+    external: ["@electric-sql/pglite"],
+  },
   plugins: [
     pgliteBootstrapPlugin(),
     // Before tanstackStart so /auth/popup never falls through to the SPA.
@@ -175,6 +180,9 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            // Ship the whole PGLite package, including pglite.data and the wasm
+            // files. A bundled copy looks beside the wrong file and crashes sign-in.
+            traceDeps: ["@electric-sql/pglite*"],
           }),
         ]
       : []),
