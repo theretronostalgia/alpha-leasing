@@ -175,9 +175,6 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
-            // Postgres wasm + pglite.data ride with the server so sign-in can
-            // open the database on a host that has no node_modules folder.
-            serverAssets: [{ baseName: "pglite", dir: "./assets/pglite" }],
           }),
         ]
       : []),

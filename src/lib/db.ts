@@ -107,32 +107,54 @@ function createNeonSql(): Promise<Sql> {
   return globalRef.__pgSqlPromise__;
 }
 
+function isWasm(bytes: Uint8Array): boolean {
+  return bytes.length > 4 && bytes[0] === 0x00 && bytes[1] === 0x61 && bytes[2] === 0x73 && bytes[3] === 0x6d;
+}
+
+function decodeB64(text: string): Uint8Array {
+  return new Uint8Array(Buffer.from(text.replace(/\s/g, ""), "base64"));
+}
+
+async function readText(file: string): Promise<string | null> {
+  try {
+    return await readFile(file, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 async function readPgliteFile(name: string): Promise<Uint8Array> {
-  const files = [
+  const wasm = name.endsWith(".wasm");
+  const binaries = [
     path.resolve("node_modules/@electric-sql/pglite/dist", name),
     path.resolve("assets/pglite", name),
     path.resolve("public/pglite", name),
   ];
-  for (const file of files) {
+  for (const file of binaries) {
     try {
-      return new Uint8Array(await readFile(file));
+      const bytes = new Uint8Array(await readFile(file));
+      // Hosts sometimes replace .wasm with a JS loader that starts with "import".
+      if (wasm && !isWasm(bytes)) continue;
+      return bytes;
     } catch {
-      /* try the next place the host might have put it */
+      /* try the next copy */
     }
   }
-  try {
-    const { useStorage } = await import("nitro/storage");
-    const raw = await useStorage("assets:pglite").getItemRaw(name);
-    if (raw instanceof Uint8Array) return raw;
-    if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
-    if (raw) return new Uint8Array(raw as ArrayBuffer);
-  } catch {
-    /* storage is only there after a production build */
+  const encoded = `${name}.b64`;
+  for (const file of [path.resolve("public/pglite", encoded), path.resolve("assets/pglite", encoded)]) {
+    const text = await readText(file);
+    if (!text) continue;
+    const bytes = decodeB64(text);
+    if (wasm && !isWasm(bytes)) continue;
+    return bytes;
   }
   const host = process.env.VERCEL_URL || process.env.VERCEL_BRANCH_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
   if (host) {
-    const res = await fetch(`https://${host.replace(/^https?:\/\//, "")}/pglite/${name}`);
-    if (res.ok) return new Uint8Array(await res.arrayBuffer());
+    const res = await fetch(`https://${host.replace(/^https?:\/\//, "")}/pglite/${encoded}`);
+    if (res.ok) {
+      const bytes = decodeB64(await res.text());
+      if (!wasm || isWasm(bytes)) return bytes;
+    }
   }
   throw new Error(`Could not load database file ${name}`);
 }
