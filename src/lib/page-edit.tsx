@@ -21,6 +21,7 @@ export function PageEditProvider({
   fields,
   images,
   texts,
+  password,
   onImage,
   onText,
   onError,
@@ -30,6 +31,7 @@ export function PageEditProvider({
   fields: Record<string, string>;
   images: Record<string, Record<string, string>>;
   texts: Record<string, Record<string, string>>;
+  password: string;
   onImage: (page: string, slot: string, url: string) => void;
   onText: (page: string, key: string, value: string) => void;
   onError: (message: string) => void;
@@ -41,7 +43,7 @@ export function PageEditProvider({
 
   function replaceImage(target: string, slot: string, file: File) {
     void readFile(file)
-      .then((image) => savePageImage({ data: { page: target, slot, image } }))
+      .then((image) => savePageImage({ data: { page: target, slot, image, password } }))
       .then((saved) => onImage(target, slot, saved.url))
       .catch((reason: unknown) => onError(reason instanceof Error ? reason.message : "Couldn’t replace that picture"));
   }
@@ -55,7 +57,7 @@ export function PageEditProvider({
         const comma = video.indexOf(",");
         return `data:${mime};base64,${comma >= 0 ? video.slice(comma + 1) : video}`;
       })
-      .then((video) => savePageVideo({ data: { page: target, slot, video } }))
+      .then((video) => savePageVideo({ data: { page: target, slot, video, password } }))
       .then((saved) => onText(target, `vid:${slot}`, saved.url))
       .catch((reason: unknown) => onError(reason instanceof Error ? reason.message : "Couldn’t replace that video"));
   }
@@ -68,7 +70,7 @@ export function PageEditProvider({
     if (leaf) {
       event.preventDefault();
       event.stopPropagation();
-      beginText(leaf, root, page, fields, texts, onText, onError);
+      beginText(leaf, root, page, fields, texts, password, onText, onError);
       return;
     }
     const video = target.closest("video");
@@ -126,6 +128,7 @@ function beginText(
   editorPage: string,
   fields: Record<string, string>,
   texts: Record<string, Record<string, string>>,
+  password: string,
   onText: (page: string, key: string, value: string) => void,
   onError: (message: string) => void,
 ) {
@@ -150,7 +153,7 @@ function beginText(
     const known = { ...(fieldPage === editorPage ? fields : {}), ...texts[fieldPage] };
     const matched = field || Object.entries(known).find(([name, value]) => !name.startsWith("img:") && !name.startsWith("dom:") && value.trim() === before)?.[0];
     const saveKey = matched || key;
-    void savePageField({ data: { page: fieldPage, key: saveKey, value: next } })
+    void savePageField({ data: { page: fieldPage, key: saveKey, value: next, password } })
       .then(() => onText(fieldPage, saveKey, next))
       .catch((reason: unknown) => onError(reason instanceof Error ? reason.message : "Couldn’t save that text"));
   };

@@ -247,11 +247,12 @@ export const savePageImage = createServerFn({ method: "POST" })
     const data = asRecord(input);
     const image = data.image;
     if (typeof image !== "string" || !image.startsWith("data:image/")) throw new Error("Choose a picture");
-    return { page: text(data, "page"), slot: text(data, "slot"), image };
+    return { page: text(data, "page"), slot: text(data, "slot"), password: text(data, "password"), image };
   })
   .handler(async ({ data, context }) => {
-    const { requirePermission, writePageImage } = await import("@/lib/access.server");
+    const { requirePermission, assertPassword, writePageImage } = await import("@/lib/access.server");
     await requirePermission(context.userId, "pages.edit");
+    await assertPassword(context.userId, data.password);
     return writePageImage(data.page, data.slot, data.image);
   });
 
@@ -261,11 +262,12 @@ export const savePageVideo = createServerFn({ method: "POST" })
     const data = asRecord(input);
     const video = data.video;
     if (typeof video !== "string" || !video.startsWith("data:video/")) throw new Error("Choose a video");
-    return { page: text(data, "page"), slot: text(data, "slot"), video };
+    return { page: text(data, "page"), slot: text(data, "slot"), password: text(data, "password"), video };
   })
   .handler(async ({ data, context }) => {
-    const { requirePermission, writePageVideo } = await import("@/lib/access.server");
+    const { requirePermission, assertPassword, writePageVideo } = await import("@/lib/access.server");
     await requirePermission(context.userId, "pages.edit");
+    await assertPassword(context.userId, data.password);
     return writePageVideo(data.page, data.slot, data.video);
   });
 
@@ -275,11 +277,12 @@ export const savePageField = createServerFn({ method: "POST" })
     const data = asRecord(input);
     const value = data.value;
     if (typeof value !== "string") throw new Error("Missing value");
-    return { page: text(data, "page"), key: text(data, "key"), value };
+    return { page: text(data, "page"), key: text(data, "key"), password: text(data, "password"), value };
   })
   .handler(async ({ data, context }) => {
-    const { requirePermission, writePageField } = await import("@/lib/access.server");
+    const { requirePermission, assertPassword, writePageField } = await import("@/lib/access.server");
     await requirePermission(context.userId, "pages.edit");
+    await assertPassword(context.userId, data.password);
     return writePageField(data.page, data.key, data.value);
   });
 
@@ -287,11 +290,12 @@ export const readPageCode = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => {
     const data = asRecord(input);
-    return { page: text(data, "page") };
+    return { page: text(data, "page"), password: text(data, "password") };
   })
   .handler(async ({ data, context }) => {
-    const { requirePermission, readPageSource } = await import("@/lib/access.server");
+    const { requirePermission, assertPassword, readPageSource } = await import("@/lib/access.server");
     await requirePermission(context.userId, "pages.edit");
+    await assertPassword(context.userId, data.password);
     if (!pageDefaults[data.page]) throw new Error("Unknown page");
     return readPageSource(data.page);
   });
@@ -302,11 +306,12 @@ export const savePageCode = createServerFn({ method: "POST" })
     const data = asRecord(input);
     const source = data.source;
     if (typeof source !== "string" || !source.trim()) throw new Error("The page code is empty");
-    return { page: text(data, "page"), source };
+    return { page: text(data, "page"), password: text(data, "password"), source };
   })
   .handler(async ({ data, context }) => {
-    const { requirePermission, writePageSource } = await import("@/lib/access.server");
+    const { requirePermission, assertPassword, writePageSource } = await import("@/lib/access.server");
     await requirePermission(context.userId, "pages.edit");
+    await assertPassword(context.userId, data.password);
     if (!pageDefaults[data.page]) throw new Error("Unknown page");
     return writePageSource(data.page, data.source);
   });
