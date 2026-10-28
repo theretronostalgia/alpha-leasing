@@ -1,9 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, X, Facebook, Instagram, Youtube } from "lucide-react";
-import { rememberSessionToken, signOut, authClient } from "@/lib/auth/client";
+import { rememberSessionToken, signOut } from "@/lib/auth/client";
+import { signInWithPassword } from "@/lib/auth/password-sign-in.functions";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { myAccess } from "@/lib/access.functions";
 import { company } from "@/lib/company";
 import { type Permission } from "@/lib/access";
 import { useAccess } from "@/lib/use-access";
@@ -171,21 +171,12 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
       return;
     }
     setBusy(true);
-    const id = email.trim();
-    const account = id.includes("@") ? id : `${id}@staff.alphaleasing.test`;
     try {
-      const result = await authClient.signIn.email({ email: account, password });
-      if (result.error) {
-        const message = result.error.message || "";
-        setError(/invalid email or password/i.test(message) ? "That employee ID or password isn’t right." : message || "Couldn’t sign in.");
-        return;
-      }
-      rememberSessionToken(result.data?.token ?? null);
-      const access = await myAccess().catch(() => ({ permissions: [] as string[] }));
-      window.location.assign(access.permissions.length ? "/office" : window.location.pathname);
+      const result = await signInWithPassword({ data: { employeeId: email.trim(), password } });
+      rememberSessionToken(result.token);
+      window.location.assign("/office");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn’t sign in.");
-    } finally {
       setBusy(false);
     }
   }
