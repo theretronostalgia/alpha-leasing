@@ -1,0 +1,11 @@
+
+.grok/
+.vercel/
+node_modules/
+dist/
+
+artifacts/
+attachments/
+.project_id
+startup.sh
+.tanstack/
