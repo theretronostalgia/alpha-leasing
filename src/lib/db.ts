@@ -1,6 +1,15 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import wasmB64 from "../../public/pglite/pglite.wasm.b64?raw";
+import initdbB64 from "../../public/pglite/initdb.wasm.b64?raw";
+import dataB64 from "../../public/pglite/pglite.data.b64?raw";
+
+const packedFiles: Record<string, string> = {
+  "pglite.wasm": wasmB64,
+  "initdb.wasm": initdbB64,
+  "pglite.data": dataB64,
+};
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
@@ -125,6 +134,11 @@ async function readText(file: string): Promise<string | null> {
 
 async function readPgliteFile(name: string): Promise<Uint8Array> {
   const wasm = name.endsWith(".wasm");
+  const packed = packedFiles[name];
+  if (packed && !packed.startsWith("/") && !packed.startsWith("http")) {
+    const bytes = decodeB64(packed);
+    if (!wasm || isWasm(bytes)) return bytes;
+  }
   const binaries = [
     path.resolve("node_modules/@electric-sql/pglite/dist", name),
     path.resolve("assets/pglite", name),
