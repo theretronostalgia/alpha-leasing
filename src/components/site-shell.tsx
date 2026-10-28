@@ -1,9 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, X, Facebook, Instagram, Youtube } from "lucide-react";
-import { rememberSessionToken, signOut } from "@/lib/auth/client";
-import { signInTestAccount } from "@/lib/auth/test-sign-in.functions";
+import { rememberSessionToken, signOut, authClient } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { myAccess } from "@/lib/access.functions";
 import { company } from "@/lib/company";
 import { type Permission } from "@/lib/access";
 import { useAccess } from "@/lib/use-access";
@@ -166,12 +166,23 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
-    setBusy(true);
-    try {
-      const result = await signInTestAccount();
-      rememberSessionToken(result.token);
-      window.location.assign("/office");
+    if (password.length < 6) {
+      setError("Use at least 6 characters.");
       return;
+    }
+    setBusy(true);
+    const id = email.trim();
+    const account = id.includes("@") ? id : `${id}@staff.alphaleasing.test`;
+    try {
+      const result = await authClient.signIn.email({ email: account, password });
+      if (result.error) {
+        const message = result.error.message || "";
+        setError(/invalid email or password/i.test(message) ? "That employee ID or password isn’t right." : message || "Couldn’t sign in.");
+        return;
+      }
+      rememberSessionToken(result.data?.token ?? null);
+      const access = await myAccess().catch(() => ({ permissions: [] as string[] }));
+      window.location.assign(access.permissions.length ? "/office" : window.location.pathname);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn’t sign in.");
     } finally {
@@ -190,6 +201,7 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
         placeholder="Employee ID"
         type="text"
         autoComplete="username"
+        required
         value={email}
         onChange={(event) => setEmail(event.target.value)}
         className={field}
@@ -199,6 +211,7 @@ export function SignInBubbles({ stacked = false }: { stacked?: boolean }) {
         placeholder="Password"
         type="password"
         autoComplete="current-password"
+        required
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         className={field}
