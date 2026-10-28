@@ -115,7 +115,33 @@ const baseURL = explicitBaseURL ?? {
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
-const trustedOrigins: string[] = explicitBaseURL
+// A downloaded copy can be hosted on any domain. Trust that domain when the
+// browser's Origin host is the same host answering the request (blocks other sites).
+function hostedOrigin(request?: Request): string | null {
+  if (!request) return null;
+  const raw = request.headers.get("origin");
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const normalize = (host: string) => {
+    const value = host.toLowerCase();
+    if (url.protocol === "https:" && value.endsWith(":443")) return value.slice(0, -4);
+    if (url.protocol === "http:" && value.endsWith(":80")) return value.slice(0, -3);
+    return value;
+  };
+  const originHost = normalize(url.host);
+  const forwarded = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = request.headers.get("host")?.trim();
+  const candidates = [forwarded, host].filter((value): value is string => Boolean(value)).map(normalize);
+  if (!originHost || !candidates.includes(originHost)) return null;
+  return url.origin;
+}
+
+const staticTrustedOrigins: string[] = explicitBaseURL
   ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
   : [
       // Host wildcards (matched against Origin's host)
@@ -124,6 +150,11 @@ const trustedOrigins: string[] = explicitBaseURL
       ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
       ...LOCAL_DEV_ORIGINS,
     ];
+
+const trustedOrigins = (request?: Request) => {
+  const origin = hostedOrigin(request);
+  return origin ? [...staticTrustedOrigins, origin] : staticTrustedOrigins;
+};
 
 const databaseUrl = env("DATABASE_URL");
 
