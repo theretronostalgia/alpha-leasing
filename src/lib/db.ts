@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 
 /** Which database backend is active. */
@@ -105,19 +107,57 @@ function createNeonSql(): Promise<Sql> {
   return globalRef.__pgSqlPromise__;
 }
 
+async function readPgliteFile(name: string): Promise<Uint8Array> {
+  const files = [
+    path.resolve("node_modules/@electric-sql/pglite/dist", name),
+    path.resolve("assets/pglite", name),
+    path.resolve("public/pglite", name),
+  ];
+  for (const file of files) {
+    try {
+      return new Uint8Array(await readFile(file));
+    } catch {
+      /* try the next place the host might have put it */
+    }
+  }
+  try {
+    const { useStorage } = await import("nitro/storage");
+    const raw = await useStorage("assets:pglite").getItemRaw(name);
+    if (raw instanceof Uint8Array) return raw;
+    if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+    if (raw) return new Uint8Array(raw as ArrayBuffer);
+  } catch {
+    /* storage is only there after a production build */
+  }
+  const host = process.env.VERCEL_URL || process.env.VERCEL_BRANCH_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (host) {
+    const res = await fetch(`https://${host.replace(/^https?:\/\//, "")}/pglite/${name}`);
+    if (res.ok) return new Uint8Array(await res.arrayBuffer());
+  }
+  throw new Error(`Could not load database file ${name}`);
+}
+
+function ownedBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return copy;
+}
+
 async function createPgliteSql(): Promise<Sql> {
   // Embedded Postgres, imported on demand so it never loads on the Neon path.
   // One in-memory instance per process, shared across HMR module instances, so
   // data survives source edits (it resets on dev-server restart).
   globalRef.__pgliteInstance__ ??= (async () => {
-    // Load the real package at runtime so the data file stays next to it.
-    // A bundled import points at /var/task/_libs/pglite.data, which hosts don't ship.
-    const specifier = "@electric-sql/pglite";
-    const load = new Function("name", "return import(name)") as (
-      name: string,
-    ) => Promise<typeof import("@electric-sql/pglite")>;
-    const { PGlite } = await load(specifier);
+    const { PGlite } = await import("@electric-sql/pglite");
+    const [wasm, initdb, data] = await Promise.all([
+      readPgliteFile("pglite.wasm"),
+      readPgliteFile("initdb.wasm"),
+      readPgliteFile("pglite.data"),
+    ]);
     const pg = new PGlite({
+      pgliteWasmModule: await WebAssembly.compile(ownedBuffer(wasm)),
+      initdbWasmModule: await WebAssembly.compile(ownedBuffer(initdb)),
+      fsBundle: new Blob([ownedBuffer(data)]),
       parsers: {
         [OID_INT8]: Number,
         [OID_DATE]: identity,
